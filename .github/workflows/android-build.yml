@@ -61,6 +61,24 @@ jobs:
           else
             bash gradlew :app:assembleDebug --no-daemon
           fi
+      - name: Inspect APK identity and permissions
+        env:
+          VARIANT: ${{ inputs.variant || 'debug' }}
+        run: |
+          APK_PATH=$(find app/build/outputs/apk -name '*.apk' -print -quit)
+          test -n "$APK_PATH"
+          EXPECTED_PACKAGE=io.github.yolo023.chaoxingautoai
+          if [ "$VARIANT" = debug ]; then EXPECTED_PACKAGE="$EXPECTED_PACKAGE.debug"; fi
+          test "$(apkanalyzer manifest application-id "$APK_PATH")" = "$EXPECTED_PACKAGE"
+          APKSIGNER_PATH=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          "$APKSIGNER_PATH" verify --verbose --print-certs "$APK_PATH" > app/build/outputs/apk/APK-INSPECTION.txt
+          apkanalyzer manifest print "$APK_PATH" > app/build/outputs/apk/AndroidManifest.xml
+          apkanalyzer manifest permissions "$APK_PATH" >> app/build/outputs/apk/APK-INSPECTION.txt
+          cat app/build/outputs/apk/APK-INSPECTION.txt
+          if grep -Eq 'android.permission.(READ_PHONE_STATE|REQUEST_INSTALL_PACKAGES)|com.google.android.gms.permission.AD_ID|io.sentry|com.umeng|stackbricks' app/build/outputs/apk/AndroidManifest.xml; then
+            echo 'Unexpected permission or removed SDK component in packaged manifest'
+            exit 1
+          fi
       - name: Hash APKs
         run: find app/build/outputs/apk -name '*.apk' -exec sha256sum {} + > app/build/outputs/apk/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
@@ -69,6 +87,8 @@ jobs:
           path: |
             app/build/outputs/apk/**/*.apk
             app/build/outputs/apk/SHA256SUMS.txt
+            app/build/outputs/apk/APK-INSPECTION.txt
+            app/build/outputs/apk/AndroidManifest.xml
           if-no-files-found: error
           retention-days: 14
       - name: Remove temporary signing key
