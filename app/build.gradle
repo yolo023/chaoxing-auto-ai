@@ -13,7 +13,11 @@ plugins {
 
 android {
     namespace = "org.aquamarine5.brainspark.chaoxingsignfaker"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
 
     defaultConfig {
         ndk {

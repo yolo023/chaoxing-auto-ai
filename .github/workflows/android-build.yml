@@ -32,7 +32,8 @@ jobs:
           java-version: '21'
       - uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-37
+          cmdline-tools-version: 16111833
+          packages: platform-tools platforms;android-37.2
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
       - name: Prepare personal release signing
