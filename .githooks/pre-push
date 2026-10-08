@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+bash "$(git rev-parse --show-toplevel)/scripts/check-personal-git.sh"
+[[ $1 == origin && $2 == "$(git config --local --get personal.remote)" ]] || {
+  echo 'Push blocked: target must be the configured personal GitHub origin.' >&2
+  exit 1
+}

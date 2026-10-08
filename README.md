@@ -1,3 +1,5 @@
+> 个人开发分支：基于上游 `1.19.1-stable`。当前仅准备仓库隔离与开发流程，未新增自动监听或生成个人 APK。开发说明见 [DEVELOPMENT.md](DEVELOPMENT.md)。
+
 # ChaoxingSignFaker
 
 [![wakatime](https://wakatime.com/badge/github/aquamarine5/ChaoxingSignFaker.svg)](https://wakatime.com/badge/github/aquamarine5/ChaoxingSignFaker)

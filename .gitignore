@@ -20,3 +20,12 @@ app/build
 /.kotlin
 .idea/copilotDiffState.xml
 /native
+
+# Personal development credentials and signing material
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+*.p12
+*.pem

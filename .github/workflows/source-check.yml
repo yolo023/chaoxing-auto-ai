@@ -1,0 +1,17 @@
+name: Source check
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check patch whitespace
+        run: git diff --check e81609c4224a99cfc48e358fc75d1eab9ba76e34 HEAD
+      - name: Check shell syntax
+        run: bash -n scripts/setup-personal-git.sh scripts/check-personal-git.sh .githooks/pre-commit .githooks/pre-push

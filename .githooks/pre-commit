@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+bash "$(git rev-parse --show-toplevel)/scripts/check-personal-git.sh"
+git diff --cached --check
