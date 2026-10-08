@@ -38,7 +38,7 @@ import com.baidu.mapapi.SDKInitializer
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.aquamarine5.brainspark.chaoxingsignfaker.MainActivity
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.UMengHelper
+import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalSignEvents
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.chaoxingDataStore
 
 @Serializable
@@ -84,7 +84,8 @@ fun WelcomeScreen(
                     append(
                         """
 
-随地大小签（ChaoxingSignFaker） 根据 GPL-3.0 协议进行开源。在使用期间会收集您的部分信息，这些数据仅用于本项目的统计分析和用户体验提升，并不会用于其他用途。您的密码不会被公开。
+本版本基于 ChaoxingSignFaker 修改，遵循 AGPL-3.0。账号会话和签到统计保存在本机；登录和签到需要向学习通发送账号、活动及相应签到信息。请勿共享含有账号凭据的二维码。
+本版本移除了友盟、Sentry 和远程签到排行榜。更新仅在点击发布页后通过浏览器访问 GitHub。
 
 """
                     )
@@ -94,20 +95,11 @@ fun WelcomeScreen(
                     append(
                         """
 
-使用SDK名称：友盟SDK
-服务类型：使用数据分析
-收集个人信息类型：设备信息（IMEI/MAC/Android ID/IDFA/OpenUDID/GUID/IP地址/SIM 卡 IMSI 信息等）
-隐私权政策链接：https://www.umeng.com/page/policy
-
 使用SDK名称：百度地图SDK
 服务类型：使用地图服务获取签到位置
 收集个人信息类型：地理位置信息
 隐私权政策链接：https://lbs.baidu.com/index.php?title=openprivacy
-
-使用SDK名称：Sentry SDK
-服务类型：使用错误收集服务
-收集个人信息类型：设备信息、设备运行截图、设备运行日志
-隐私权政策链接：https://sentry.io/trust/privacy/""".trimIndent()
+""".trimIndent()
                     )
                 }
             )
@@ -124,7 +116,7 @@ fun WelcomeScreen(
                         it.toBuilder().setAgreeTerms(true).build()
                     }
                 }
-                UMengHelper.init(context)
+
                 SDKInitializer.setAgreePrivacy(context, true)
                 LocationClient.setAgreePrivacy(true)
                 navToLoginDestination()

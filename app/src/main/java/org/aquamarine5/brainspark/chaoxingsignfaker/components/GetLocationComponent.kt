@@ -109,7 +109,6 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.createBitmapDescri
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.displaySnackbar
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.updateMarkerTitlesVisibility
 
-
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun GetLocationComponent(
@@ -117,6 +116,11 @@ fun GetLocationComponent(
     confirmButtonText: @Composable () -> Unit,
     onLocationResult: (ChaoxingLocationSignEntity) -> Unit
 ) {
+    if (!org.aquamarine5.brainspark.chaoxingsignfaker.BuildConfig.IS_MAP_CONFIGURED) {
+        Text("此版本暂未配置地图服务，请返回后使用官方学习通完成需要位置的签到。")
+        return
+    }
+
     val hapticFeedback = LocalHapticFeedback.current
     val snackbarHost = LocalSnackbarHostState.current
     val context = LocalContext.current

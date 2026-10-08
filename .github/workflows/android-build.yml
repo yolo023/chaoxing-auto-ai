@@ -1,0 +1,72 @@
+name: Personal Android build
+on:
+  push:
+    branches: [main, 'personal/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: Build debug for evaluation or release with personal signing secrets
+        type: choice
+        options: [debug, release]
+        default: debug
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate personal configuration
+        run: python3 scripts/check-personal-source.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Prepare personal release signing
+        if: github.event_name == 'workflow_dispatch' && inputs.variant == 'release'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64" && test -n "$STORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD" || { echo 'Personal signing secrets are required'; exit 1; }
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/personal-release.jks"
+      - name: Build APK
+        env:
+          VARIANT: ${{ inputs.variant || 'debug' }}
+          BAIDU_MAP_API_KEY: ${{ inputs.variant == 'release' && secrets.BAIDU_MAP_API_KEY || secrets.BAIDU_MAP_API_KEY_DEBUG }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ "$VARIANT" = release ]; then
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/personal-release.jks"
+            bash gradlew :app:assembleRelease --no-daemon
+          else
+            bash gradlew :app:assembleDebug --no-daemon
+          fi
+      - name: Hash APKs
+        run: find app/build/outputs/apk -name '*.apk' -exec sha256sum {} + > app/build/outputs/apk/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chaoxing-auto-ai-${{ inputs.variant || 'debug' }}-${{ github.sha }}
+          path: |
+            app/build/outputs/apk/**/*.apk
+            app/build/outputs/apk/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/personal-release.jks"

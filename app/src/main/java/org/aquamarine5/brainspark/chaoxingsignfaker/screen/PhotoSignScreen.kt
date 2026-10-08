@@ -80,7 +80,6 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.components.OtherUserSelector
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.SignOutRedirectTips
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.SignPotentialWarningTips
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.SnackbarAlertDialog
-import org.aquamarine5.brainspark.chaoxingsignfaker.components.SponsorPopupDialog
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.cloneSessionGuard
 import org.aquamarine5.brainspark.chaoxingsignfaker.datastore.ChaoxingOtherUserSession
 import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ChaoxingSignActivityEntity
@@ -92,7 +91,7 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.entity.SignDestination
 import org.aquamarine5.brainspark.chaoxingsignfaker.signer.ChaoxingPhotoSigner
 import org.aquamarine5.brainspark.chaoxingsignfaker.signer.ChaoxingSignHandler
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalSnackbarHostState
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.UMengHelper
+import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalSignEvents
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.decodePhotoBitmap
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.randomizeStylizeImage
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.snackbarReport
@@ -154,11 +153,8 @@ fun PhotoSignScreen(
     var isSignSuccess by remember { mutableStateOf(false) }
     var isShowPhotoPicker by remember { mutableStateOf(false) }
     var isForSelf by remember { mutableStateOf(false) }
-    var isSponsor by remember { mutableStateOf(false) }
     var signoffEntity by remember { mutableStateOf<ChaoxingSignOutEntity?>(null) }
-    if (isSponsor) {
-        SponsorPopupDialog()
-    }
+
     var captchaValidateParams by remember {
         mutableStateOf<CaptchaHandlerParams<ChaoxingPhotoSigner>>(null)
     }
@@ -322,7 +318,7 @@ fun PhotoSignScreen(
                                         destination = destination,
                                         onSigningFinished = { _, name, isOtherUser ->
                                             coroutineScope.launch {
-                                                UMengHelper.onSignClickEvent(
+                                                LocalSignEvents.onSignClickEvent(
                                                     context,
                                                     name,
                                                     isOtherUser
@@ -334,7 +330,7 @@ fun PhotoSignScreen(
                                             if (isSuccessful)
                                                 coroutineScope.launch {
                                                     delay(ChaoxingSignHelper.TIMEOUT_SHOW_SPONSOR_AFTER_ALL_SIGNED)
-                                                    isSponsor = true
+
                                                 }
                                         }, userSelections = userSelections,
                                         signStatus = signStatus
@@ -543,7 +539,7 @@ fun PhotoSignScreen(
                                                 },
                                                 onSigningFinished = { _, name, isOtherUser ->
                                                     coroutineScope.launch {
-                                                        UMengHelper.onSignPhotoEvent(
+                                                        LocalSignEvents.onSignPhotoEvent(
                                                             context,
                                                             name,
                                                             isOtherUser
@@ -556,7 +552,7 @@ fun PhotoSignScreen(
                                                     if (isSuccessful) {
                                                         coroutineScope.launch {
                                                             delay(ChaoxingSignHelper.TIMEOUT_SHOW_SPONSOR_AFTER_ALL_SIGNED)
-                                                            isSponsor = true
+
                                                         }
                                                     }
                                                 },
@@ -859,7 +855,7 @@ fun PhotoSignScreen(
                                                                         }
                                                                     }
                                                             } else isSignSuccess = true
-                                                            UMengHelper.onSignPhotoEvent(
+                                                            LocalSignEvents.onSignPhotoEvent(
                                                                 context,
                                                                 ChaoxingHttpClient.instance!!.name
                                                             )

@@ -23,16 +23,41 @@ bash scripts/check-personal-git.sh
 新克隆不会自动启用 hooks，必须先运行 setup-personal-git.sh。本地钩子是误操作防护，不是不可绕过的权限系统。
 准备阶段使用空的本地身份阻止继承公司配置；核验 GitHub 账号后，仅在本仓库配置个人身份。
 
-## 功能范围与后续开发
+## 第一版实现与构建
 
-第一版沿用登录、课程、活动、手动签到。尚未增加后台监听、刷课或答题。
-原作者的 GitHub Actions 工作流已转存为 .reference 文件，避免 Fork 后触发原作者发布、统计图更新和外部上传。
-当前只提供手动触发的源码差异检查，不生成或发布 APK。
+保留登录、课程、活动和手动签到；后台监听、刷课、答题不属于本轮。
+代码 namespace 仍为上游名称，安装包 applicationId 已独立。首次安装需要重新登录，不会接管原版账号数据。
+上游发布工作流保存在 docs/upstream-workflows；个人工作流不会向原作者服务上传。
+Stackbricks、友盟、Sentry 和远程排行榜已移除，不再需要 GHP_TOKEN。地图 SDK 仍需百度服务。
 
-正式构建前需完成独立签名、包名和地图配置、更新渠道及统计/错误上报的处理。
-上游 Stackbricks 依赖来自 GitHub Packages，构建认证需单独验证；本底座没有放入访问令牌。
-上游历史和工作树仍含原有签名材料，禁止作为个人版本发布密钥；新增密钥已加入忽略规则。
-当前没有进行本地编译、病毒扫描或真机验证，也未宣称源码与上游 APK 已完成可复现构建校验。
+GitHub Actions → Personal Android build：push/PR 默认 assembleDebug，手动运行可选择 release。产物在对应运行的 Artifacts，包含 APK 和 SHA256SUMS.txt；未自动上传到 Releases。
+只读静态检查命令：
+
+```bash
+python3 scripts/check-personal-source.py
+bash scripts/check-personal-git.sh
+git diff --check
+```
+
+正式签名在 GitHub 仓库 Settings → Secrets and variables → Actions 配置：
+
+| Secret | 内容 |
+| --- | --- |
+| ANDROID_KEYSTORE_BASE64 | 个人 keystore 的 Base64，不得使用上游密钥 |
+| ANDROID_KEYSTORE_PASSWORD | keystore 密码 |
+| ANDROID_KEY_ALIAS | 个人签名别名 |
+| ANDROID_KEY_PASSWORD | 私钥密码 |
+| BAIDU_MAP_API_KEY | 正式包名和正式签名对应的百度地图 Key |
+| BAIDU_MAP_API_KEY_DEBUG | 可选，调试包和其签名对应的地图 Key |
+
+工作流缺少正式签名参数会失败，不回退到作者或临时密钥。私钥只在 runner 临时目录解码，结束时删除。不要把私钥、密码或学习通账号提交到 Git。
+本地若后续需要编译，同名环境变量适用，ANDROID_KEYSTORE_PATH 指向个人 keystore；本轮默认不在本地编译。
+调试构建每次 CI 的临时签名可能不同，不能作为给长期使用者的稳定更新渠道。正式签名必须妥善备份并保持一致。
+
+地图 Key 尚未配置时，地图和位置选择界面会提示不可用；普通签到不依赖地图，但任何要求位置信息的签到都需先完成地图配置与实机验证。不能仅凭构建成功承诺签到成功。
+
+分发前应核验 APK 包名、签名指纹、合并权限和 SHA-256，并实机检查首次同意条款、登录/退出、课程刷新、普通及扫码签到、无地图 Key 提示、打开个人发布页、与原版并存。
+本轮未做本地编译、真机验证、恶意软件扫描或源码与 APK 可复现比对。云端构建状态以 Actions 运行结果为准。
 
 ## 远程状态
 

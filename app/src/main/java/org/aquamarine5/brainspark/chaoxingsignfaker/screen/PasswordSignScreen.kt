@@ -76,7 +76,6 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.components.NotReadyToSignNot
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.OtherUserSelectorComponent
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.SignOutRedirectTips
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.SignPotentialWarningTips
-import org.aquamarine5.brainspark.chaoxingsignfaker.components.SponsorPopupDialog
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.cloneSessionGuard
 import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ChaoxingLocationSignEntity
 import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ChaoxingSignActivityEntity
@@ -88,10 +87,9 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.entity.SignDestination
 import org.aquamarine5.brainspark.chaoxingsignfaker.signer.ChaoxingPasswordSigner
 import org.aquamarine5.brainspark.chaoxingsignfaker.signer.ChaoxingSignHandler
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalSnackbarHostState
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.UMengHelper
+import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalSignEvents
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.snackbarReport
 import kotlin.time.Duration.Companion.seconds
-
 
 @Serializable
 data class PasswordSignDestination(
@@ -148,11 +146,8 @@ fun PasswordSignScreen(
             destination
         )
     }
-    var isSponsor by remember { mutableStateOf(false) }
     var numberCount by remember { mutableIntStateOf(-1) }
-    if (isSponsor) {
-        SponsorPopupDialog()
-    }
+
     var captchaValidateParams by remember {
         mutableStateOf<CaptchaHandlerParams<ChaoxingPasswordSigner>>(
             null
@@ -353,7 +348,7 @@ fun PasswordSignScreen(
                             },
                             onSigningFinished = { _, name, isOtherUser ->
                                 coroutineScope.launch {
-                                    UMengHelper.onSignCodeEvent(
+                                    LocalSignEvents.onSignCodeEvent(
                                         context,
                                         name,
                                         isOtherUser
@@ -365,7 +360,7 @@ fun PasswordSignScreen(
                                 if (isSuccessful) {
                                     coroutineScope.launch {
                                         delay(ChaoxingSignHelper.TIMEOUT_SHOW_SPONSOR_AFTER_ALL_SIGNED)
-                                        isSponsor = true
+
                                     }
                                 }
                             })

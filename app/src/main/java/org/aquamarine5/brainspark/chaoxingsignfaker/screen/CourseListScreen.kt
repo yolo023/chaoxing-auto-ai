@@ -90,7 +90,6 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.api.ChaoxingCourseHelper
 import org.aquamarine5.brainspark.chaoxingsignfaker.api.ChaoxingHttpClient
 import org.aquamarine5.brainspark.chaoxingsignfaker.api.ChaoxingLessonHelper
 import org.aquamarine5.brainspark.chaoxingsignfaker.api.ChaoxingRecommendHelper
-import org.aquamarine5.brainspark.chaoxingsignfaker.components.BlockedContent
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.CenterCircularProgressIndicator
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.CourseInfoColumnCard
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.NetworkExceptionComponent
@@ -107,8 +106,6 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.chaoxingDataStore
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.disableCode
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.disableComposableCode
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.snackbarReport
-import org.aquamarine5.brainspark.stackbricks.StackbricksService
-import org.aquamarine5.brainspark.stackbricks.StackbricksVersionData
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -131,9 +128,7 @@ private const val SORT_COMMON = 0
 @Composable
 fun CourseListScreen(
     destination: CourseListDestination,
-    stackbricksService: StackbricksService,
     navToDetailDestination: (CourseDetailDestination) -> Unit,
-    onNewVersionAvailable: () -> Unit,
     navToSettingDestination: () -> Unit,
     navToSignActivityDestination: (SignDestination) -> Unit,
     navToLoginDestination: () -> Unit,
@@ -150,8 +145,6 @@ fun CourseListScreen(
     }
     val hapticFeedback = LocalHapticFeedback.current
     val context = LocalContext.current
-    var newestVersionData by rememberSaveable { mutableStateOf<StackbricksVersionData?>(null) }
-    var isForceInstall by rememberSaveable { mutableStateOf(false) }
     val snackbarHost = LocalSnackbarHostState.current
     var recommendActivities by remember { mutableStateOf<List<RecommendActivityEntity>?>(null) }
     var lessonSignActivities by remember { mutableStateOf<List<RecommendActivityEntity>?>(null) }
@@ -171,21 +164,6 @@ fun CourseListScreen(
             savedCourseCacheKey = courseCacheKey
         }
         withContext(Dispatchers.IO) {
-            launch {
-                runCatching {
-                    withTimeout(2.seconds) {
-                        if (stackbricksService.internalVersionData == null) {
-                            newestVersionData = stackbricksService.isNeedUpdate()
-                            newestVersionData?.forceInstallLessVersion?.let {
-                                isForceInstall =
-                                    (it > BuildConfig.VERSION_CODE)
-                            }
-                        }
-                    }
-                }.onFailure {
-                    it.snackbarReport(snackbarHost, coroutineScope, "检查更新失败", hapticFeedback)
-                }
-            }
             disableCode {
                 recommendActivities =
                     ChaoxingRecommendHelper.checkRecommendedActivities(context)
@@ -272,110 +250,7 @@ fun CourseListScreen(
             }
         }
     }
-    var isEmergencyToSkipUpdate by remember { mutableStateOf(false) }
-    if (isEmergencyToSkipUpdate) {
-        SnackbarAlertDialog(onDismissRequest = {
-            isEmergencyToSkipUpdate = false
-        }, dismissButton = {
-            TextButton(onClick = {
-                hapticFeedback.performHapticFeedback(HapticFeedbackType.ContextClick)
-                isEmergencyToSkipUpdate = false
-                newestVersionData = null
-            }) {
-                Text("着急签到一会更新")
-            }
-        }, confirmButton = {
-            Button(onClick = {
-                hapticFeedback.performHapticFeedback(HapticFeedbackType.ContextClick)
-                navToSettingDestination()
-            }) {
-                Text("现在去更新")
-            }
-        }, icon = {
-            Icon(
-                painterResource(R.drawable.ic_arrow_big_up_dash),
-                null,
-                tint = MaterialTheme.colorScheme.primary
-            )
-        }, text = {
-            Text("此版本设置了强制更新，强烈建议进行更新，忽略更新可能导致签到失败或其他意外的BUG。")
-        })
-    }
-    if (newestVersionData != null) {
-        SideEffect(newestVersionData) {
-            onNewVersionAvailable()
-        }
-        SnackbarAlertDialog(onDismissRequest = {
-            if (isForceInstall) {
-                Toast.makeText(context, "必须更新应用", Toast.LENGTH_SHORT).show()
-            } else {
-                newestVersionData = null
-            }
-        }, confirmButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                Button(onClick = {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.ContextClick)
-                    navToSettingDestination()
-                }) {
-                    Text("去更新", maxLines = 1)
-                }
-                TextButton(onClick = {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.ContextClick)
-                    if (isForceInstall)
-                        isEmergencyToSkipUpdate = true
-                    else
-                        newestVersionData = null
-                }) {
-                    Text("我着急签到，来不及更新")
-                }
-            }
-        }, text = {
-            Column {
-                Text(buildAnnotatedString {
-                    append("检测到新版本：")
-                    withStyle(
-                        SpanStyle(
-                            fontWeight = FontWeight.Bold, fontFamily = FontGilroy
-                        )
-                    ) {
-                        append(
-                            newestVersionData?.versionName
-                                ?: stackbricksService.internalVersionData?.versionName
-                        )
-                    }
-                    append("\n当前版本：")
-                    withStyle(
-                        SpanStyle(
-                            fontWeight = FontWeight.Bold, fontFamily = FontGilroy
-                        )
-                    ) {
-                        append(stackbricksService.getCurrentVersionName())
-                    }
-                    append("\n更新日志：\n")
-                }
-                )
-                val changelogRaw = newestVersionData?.changelog
-                    ?: stackbricksService.internalVersionData?.changelog ?: "暂无更新日志"
-                val changelogGray = MaterialTheme.colorScheme.onSurfaceVariant
-                Text(
-                    remember(changelogRaw, changelogGray) {
-                        parseChangelogToAnnotatedString(changelogRaw, changelogGray)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 320.dp)
-                        .verticalScroll(rememberScrollState()),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
-                )
-            }
-        }, title = {
-            Text("有新版本可用！")
-        }, icon = {
-            Icon(painterResource(R.drawable.ic_circle_arrow_up), null)
-        })
-    }
-    BlockedContent {
+
         Column(
             modifier = Modifier
                 .padding(16.dp, 0.dp, 16.dp, 0.dp)
@@ -977,7 +852,7 @@ fun CourseListScreen(
                 }
             }
         }
-    }
+
 }
 
 private fun parseChangelogToAnnotatedString(

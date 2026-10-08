@@ -6,6 +6,7 @@
 
 package org.aquamarine5.brainspark.chaoxingsignfaker.screen
 
+import androidx.core.net.toUri
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -160,7 +161,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.aquamarine5.brainspark.chaoxingsignfaker.R
 import org.aquamarine5.brainspark.chaoxingsignfaker.api.ChaoxingFaceHelper
 import org.aquamarine5.brainspark.chaoxingsignfaker.api.ChaoxingHttpClient
@@ -180,12 +180,12 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ChaoxingOtherUserShar
 import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ImportOtherUserResult
 import org.aquamarine5.brainspark.chaoxingsignfaker.entity.getResultTips
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalSnackbarHostState
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.UMengHelper
+import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalSignEvents
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.chaoxingDataStore
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.checkPredictable
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.displaySnackbar
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.isDevelopedMode
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.sentryReport
+import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.reportLocalError
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.snackbarReport
 import sh.calvin.reorderable.DragGestureDetector
 import sh.calvin.reorderable.ReorderableColumn
@@ -706,10 +706,7 @@ fun OtherUserScreen(
                                     .show()
                                 when (result.first) {
                                     ChaoxingImportOtherUserResultStatus.SUCCESS -> {
-                                        UMengHelper.onAccountOtherUserAddEvent(
-                                            context,
-                                            result.third
-                                        )
+
                                         otherUserSessions.add(result.third)
                                         userTagList.add(mutableStateOf(emptyList()))
                                     }
@@ -1521,7 +1518,7 @@ fun OtherUserScreen(
                             repairSessionIndex = null
                         }.onFailure {
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.Reject)
-                            it.sentryReport()
+                            it.reportLocalError()
                             errorMessage = "登录失败：" + (it.message ?: "未知错误")
                         }
                     }
@@ -2092,22 +2089,22 @@ fun OtherUserScreen(
                     FilledTonalButton(onClick = {
                         if (inputUrl.isNotBlank()) {
                             val url =
-                                Regex("""https?://[^\s，。、]+""").find(inputUrl)?.value?.toHttpUrlOrNull()
+                                Regex("""(?:cxautoai|https?)://[^\s，。、]+""").find(inputUrl)?.value?.toUri()
                             if (url == null) {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.Reject)
                                 Toast.makeText(context, "链接格式错误", Toast.LENGTH_SHORT).show()
                                 return@FilledTonalButton
                             }
-                            val phone = url.queryParameter("phone")
-                            val pwd = url.queryParameter("pwd")
-                            val name = url.queryParameter("name")
-                            val faceObjectIds = url.queryParameter("face")
+                            val phone = url.getQueryParameter("phone")
+                            val pwd = url.getQueryParameter("pwd")
+                            val name = url.getQueryParameter("name")
+                            val faceObjectIds = url.getQueryParameter("face")
                                 ?.split(',')
                                 ?.filter { it.isNotBlank() }
                                 ?.distinct()
                                 .orEmpty()
                             val deviceCode =
-                                url.queryParameter("dc")?.takeIf { it.isNotEmpty() }
+                                url.getQueryParameter("dc")?.takeIf { it.isNotEmpty() }
                             if (phone == null || pwd == null || name == null) {
                                 hapticFeedback.performHapticFeedback(HapticFeedbackType.Reject)
                                 Toast.makeText(context, "链接格式错误", Toast.LENGTH_SHORT).show()
@@ -2135,10 +2132,7 @@ fun OtherUserScreen(
                                         .show()
                                     when (result.first) {
                                         ChaoxingImportOtherUserResultStatus.SUCCESS -> {
-                                            UMengHelper.onAccountOtherUserAddEvent(
-                                                context,
-                                                result.third
-                                            )
+
                                             otherUserSessions.add(result.third)
                                             userTagList.add(mutableStateOf(emptyList()))
                                         }
@@ -3269,7 +3263,7 @@ fun OtherUserScreen(
                             isQRCodeScanPause.value = true
                             return@runCatching ChaoxingOtherUserSharedEntity.parseFromQRCode(qr)
                         }.onFailure { failure ->
-                            failure.sentryReport()
+                            failure.reportLocalError()
                             isQRCodeIllegal = true
                             isQRCodeParsing.value = false
                             hapticFeedback.performHapticFeedback(HapticFeedbackType.Reject)
@@ -3292,10 +3286,7 @@ fun OtherUserScreen(
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.Confirm)
                                     when (result.first) {
                                         ChaoxingImportOtherUserResultStatus.SUCCESS -> {
-                                            UMengHelper.onAccountOtherUserAddEvent(
-                                                context,
-                                                result.third
-                                            )
+
                                             otherUserSessions.add(result.third)
                                             userTagList.add(mutableStateOf(emptyList()))
                                         }
@@ -3318,7 +3309,7 @@ fun OtherUserScreen(
                                         }
                                     }
                                 }.onFailure { failure ->
-                                    failure.sentryReport()
+                                    failure.reportLocalError()
                                     isQRCodeIllegal = true
                                     isQRCodeParsing.value = false
                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.Reject)

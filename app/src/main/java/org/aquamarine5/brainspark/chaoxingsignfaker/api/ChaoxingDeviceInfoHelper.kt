@@ -15,7 +15,6 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Base64
 import com.alibaba.fastjson2.JSONObject
-import com.umeng.commonsdk.UMConfigure
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
@@ -114,24 +113,10 @@ object ChaoxingDeviceInfoHelper {
     }
 
     private suspend fun getLocalMachineUniqueId(context: Context): String {
-        val uniqueId = runCatching {
-            withTimeout(1.seconds) {
-                suspendCancellableCoroutine { continuation ->
-                    UMConfigure.getOaid(context.applicationContext) { deviceId ->
-                        if (continuation.isActive) continuation.resume(deviceId.orEmpty())
-                    }
-                }
-            }
-        }.getOrElse {
-            return ""
-        }
-        return if (uniqueId.isNotBlank() &&
-            !INVALID_UNIQUE_ID_REGEX.matches(uniqueId.replace("-", ""))
-        ) {
-            uniqueId
-        } else {
-            ""
-        }
+        return android.provider.Settings.Secure.getString(
+            context.contentResolver,
+            android.provider.Settings.Secure.ANDROID_ID
+        ).orEmpty()
     }
 
     @SuppressLint("HardwareIds")

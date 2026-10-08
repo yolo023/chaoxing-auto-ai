@@ -36,7 +36,7 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ChaoxingSignActivityS
 import org.aquamarine5.brainspark.chaoxingsignfaker.signer.ChaoxingQRCodeSigner.QRCodeExpiredException
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.ChaoxingFaceSignException
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.ChaoxingParseDataException
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.UMengHelper
+import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalSignEvents
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.checkResponseThrowException
 import java.util.Locale
 import java.util.UUID
@@ -241,7 +241,6 @@ abstract class ChaoxingSigner(
             ).build()
         ).execute().close()
     }
-
 
     private fun HttpUrl.Builder.addLocationDataParameter(
         position: ChaoxingLocationSignEntity,
@@ -513,10 +512,10 @@ abstract class ChaoxingSigner(
     open suspend fun getCaptchaImageV2(): ChaoxingCaptchaDataEntity = withContext(Dispatchers.IO) {
         val t = getCaptchaConf()
         val type = "slide"
-        val captchaKey = UMengHelper.md5("$t${UUID.randomUUID()}")
+        val captchaKey = LocalSignEvents.md5("$t${UUID.randomUUID()}")
         val iv =
-            UMengHelper.md5("${getCaptchaId()}$type${System.currentTimeMillis()}${UUID.randomUUID()}")
-        val token = UMengHelper.md5("$t${getCaptchaId()}$type$captchaKey") + ":${t + 300000L}"
+            LocalSignEvents.md5("${getCaptchaId()}$type${System.currentTimeMillis()}${UUID.randomUUID()}")
+        val token = LocalSignEvents.md5("$t${getCaptchaId()}$type$captchaKey") + ":${t + 300000L}"
         client.newCall(
             Request.Builder().get().url(
                 URL_CAPTCHA_IMAGE.newBuilder()

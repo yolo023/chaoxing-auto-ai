@@ -22,7 +22,7 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.StoredData
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.chaoxingDataStore
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.checkResponseThrowException
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.checkThrowFaceException
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.sentryReport
+import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.reportLocalError
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.storedData
 import java.io.File
 import java.security.MessageDigest
@@ -104,7 +104,7 @@ object ChaoxingFaceHelper {
                         addSignToken(clientId, fields, cxtime)
                     }
                 }.onFailure {
-                    it.sentryReport()
+                    it.reportLocalError()
                 }
             }
     }
@@ -136,7 +136,6 @@ object ChaoxingFaceHelper {
     private fun md5(value: String): String =
         MessageDigest.getInstance("MD5").digest(value.toByteArray(Charsets.UTF_8))
             .joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
-
 
     fun getFaceImageFile(context: Context, objectId: String): File {
         checkThrowFaceException(objectId.isNotBlank()) { "人脸照片 ID 不能为空" }

@@ -7,230 +7,14 @@
 package org.aquamarine5.brainspark.chaoxingsignfaker.utilities
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.listSaver
-import com.alibaba.fastjson2.JSONArray
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import okhttp3.FormBody
-import okhttp3.Request
-import org.aquamarine5.brainspark.chaoxingsignfaker.BuildConfig
-import org.aquamarine5.brainspark.chaoxingsignfaker.api.ChaoxingHttpClient
 import org.aquamarine5.brainspark.chaoxingsignfaker.datastore.ChaoxingSignFakerDataStore
-import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ChaoxingAnalyserRankAnalysis
-import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ChaoxingAnalyserRankRecord
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
-
-private const val SUPABASE_ENDPOINT =
-    "https://zpkavhhjdtghljleztpb.supabase.co/rest/v1"
-private const val SUPABASE_DATABASE_ID = "AnalyserData"
-private const val SUPABASE_RANK_VIEW_ID = "user_sign_rank"
-private const val SUPABASE_RANK_ANALYSIS_ID = "total_sign_view"
-private const val SUPABASE_API_KEY = "sb_publishable_dFuI4bOoYPlDozMXOGKgPg_cCQ0o22B"
 
 object ChaoxingAnalyser {
-    lateinit var rankUUID: String
-
-    suspend fun getTotalRankAnalysis(): Result<ChaoxingAnalyserRankAnalysis> {
-        return withContext(Dispatchers.IO) {
-            runCatching {
-                ChaoxingHttpClient.instance!!.newCall(
-                    Request.Builder()
-                        .url("$SUPABASE_ENDPOINT/$SUPABASE_RANK_ANALYSIS_ID?select=userCount,totalRecordSignCount&limit=1")
-                        .get()
-                        .header(
-                            "apikey",
-                            SUPABASE_API_KEY
-                        )
-                        .build()
-                ).execute().use { response ->
-                    response.checkResponseThrowException()
-                    val jsonObject = JSONArray.parseArray(response.body.string()).getJSONObject(0)
-                    return@runCatching ChaoxingAnalyserRankAnalysis(
-                        jsonObject.getInteger("userCount"),
-                        jsonObject.getInteger("totalRecordSignCount")
-                    )
-                }
-            }
-        }
-    }
-
-    suspend fun getUserTopRank(uuid: String): Result<Int> {
-        return withContext(Dispatchers.IO) {
-            runCatching {
-                ChaoxingHttpClient.instance!!.newCall(
-                    Request.Builder()
-                        .url("$SUPABASE_ENDPOINT/$SUPABASE_RANK_VIEW_ID?select=rank&limit=1&uuid=eq.$uuid")
-                        .get()
-                        .header(
-                            "apikey",
-                            SUPABASE_API_KEY
-                        )
-                        .build()
-                ).execute().use { response ->
-                    response.checkResponseThrowException()
-                    val responseBody = response.body.string()
-                    return@runCatching JSONArray.parseArray(responseBody).getJSONObject(0)
-                        .getInteger("rank")
-                }
-            }
-        }
-    }
-
-    private val jsonParser = Json { ignoreUnknownKeys = true }
-
-    suspend fun getAnalyserTopRank(topCount: Int): Result<List<ChaoxingAnalyserRankRecord>> {
-        return withContext(Dispatchers.IO) {
-            runCatching {
-                ChaoxingHttpClient.instance!!.newCall(
-                    Request.Builder()
-                        .url(
-                            "$SUPABASE_ENDPOINT/$SUPABASE_DATABASE_ID?order=totalSignCount.desc&limit=${
-                                topCount.coerceIn(
-                                    1,
-                                    100
-                                )
-                            }&isPublic=eq.TRUE"
-                        )
-                        .get()
-                        .header(
-                            "apikey",
-                            SUPABASE_API_KEY
-                        )
-                        .build()
-                ).execute().use { response ->
-                    response.checkResponseThrowException()
-                    val responseBody = response.body.string()
-                    jsonParser
-                        .decodeFromString<List<ChaoxingAnalyserRankRecord>>(responseBody)
-                }
-            }
-        }
-    }
-
-    suspend fun checkAndUploadAnalyserRankData(context: Context) {
-        withContext(Dispatchers.IO) {
-            val currentDate =
-                LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")).toInt()
-            val stringDate = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-            context.chaoxingDataStore.updateData { dataStore ->
-                if (dataStore.disableAnalysisRank) return@updateData dataStore
-                val analysisName = dataStore.analysisRankName.ifEmpty {
-                    "****${ChaoxingHttpClient.instance!!.phoneNumber.takeLast(2)} 用户"
-                }
-                dataStore.toBuilder().apply {
-                    val analysisDatabaseUUID = analysisUUID.ifEmpty {
-                        rankUUID.also {
-                            setAnalysisUUID(it)
-                        }
-                    }
-                    if (lastUploadAnalysisDate < currentDate) {
-                        runCatching {
-                            ChaoxingHttpClient.instance!!.newCall(
-                                Request.Builder()
-                                    .url("$SUPABASE_ENDPOINT/$SUPABASE_DATABASE_ID")
-                                    .header(
-                                        "apikey",
-                                        SUPABASE_API_KEY
-                                    )
-                                    .header("Prefer", "resolution=merge-duplicates")
-                                    .post(
-                                        FormBody.Builder()
-                                            .addEncoded(
-                                                "otherSign",
-                                                mutableAnalyser.otherUserSignCount.value.toString()
-                                            )
-                                            .addEncoded(
-                                                "photoSign",
-                                                mutableAnalyser.photoSignCount.value.toString()
-                                            )
-                                            .addEncoded(
-                                                "gestureSign",
-                                                mutableAnalyser.gestureSignCount.value.toString()
-                                            )
-                                            .addEncoded(
-                                                "locationSign",
-                                                mutableAnalyser.locationSignCount.value.toString()
-                                            )
-                                            .addEncoded(
-                                                "qrcodeSign",
-                                                mutableAnalyser.qrcodeSignCount.value.toString()
-                                            )
-                                            .addEncoded(
-                                                "clickSign",
-                                                mutableAnalyser.clickSignCount.value.toString()
-                                            )
-                                            .addEncoded(
-                                                "passwordSign",
-                                                mutableAnalyser.passwordSignCount.value.toString()
-                                            )
-                                            .addEncoded("latestDate", stringDate)
-                                            .addEncoded(
-                                                "schoolName",
-                                                ChaoxingHttpClient.instance!!.userEntity.fidList.map { it.second }
-                                                    .distinct().let { rawList ->
-                                                        if (dataStore.selectedAnalysisRankSchoolName.isNotEmpty() && rawList.contains(
-                                                                dataStore.selectedAnalysisRankSchoolName
-                                                            )
-                                                        )
-                                                            return@let dataStore.selectedAnalysisRankSchoolName
-                                                        rawList.toMutableList().run {
-                                                            removeAll { it[0].isDigit() }
-                                                            removeAll { it.endsWith("图书馆") }
-                                                            if (isEmpty())
-                                                                return@let rawList[0]
-                                                            sortBy { it.length }
-                                                            return@let get(0)
-                                                        }
-                                                    }.let { str ->
-                                                        if (dataStore.hideAnalysisRankSchoolName) str.plus(
-                                                            "HIDE"
-                                                        ) else str
-                                                    }
-                                            )
-                                            .addEncoded("uuid", analysisDatabaseUUID)
-                                            .addEncoded(
-                                                "totalSignCount",
-                                                (mutableAnalyser.photoSignCount.value + mutableAnalyser.gestureSignCount.value + mutableAnalyser.locationSignCount.value + mutableAnalyser.qrcodeSignCount.value + mutableAnalyser.clickSignCount.value + mutableAnalyser.passwordSignCount.value).toString()
-                                            )
-                                            .addEncoded("isPublic", "true")
-                                            .addEncoded("name", analysisName)
-                                            .addEncoded("versionName", BuildConfig.VERSION_NAME)
-                                            .build()
-                                    ).build()
-                            )
-                                .execute().use { response ->
-                                    response.checkResponseThrowException()
-                                }
-                        }.onSuccess {
-                            setLastUploadAnalysisDate(currentDate)
-                            setLastUploadAnalysisTimestamp(System.currentTimeMillis())
-                        }.onFailure {
-                            it.printStackTrace()
-                            it.sentryReport()
-                            withContext(Dispatchers.Main) {
-                                Toast.makeText(
-                                    context,
-                                    "上传排行榜数据失败: ${it.message}",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        }
-                    }
-                }.build()
-            }
-        }
-    }
-
-
     data class MutableStateAnalyser(
         val photoSignCount: MutableState<Int> = mutableIntStateOf(0),
         val gestureSignCount: MutableState<Int> = mutableIntStateOf(0),
@@ -339,7 +123,6 @@ object ChaoxingAnalyser {
         return mutableAnalyser
     }
 
-    @OptIn(ExperimentalUuidApi::class)
     suspend fun setupStateAnalyser(context: Context): MutableStateAnalyser {
         context.chaoxingDataStore.data.first().apply {
             mutableAnalyser.passwordSignCount.value = analysis.passwordSign
@@ -350,14 +133,10 @@ object ChaoxingAnalyser {
             mutableAnalyser.clickSignCount.value = analysis.clickSign
             mutableAnalyser.otherUserSignCount.value = analysis.otherUserSign
             mutableAnalyser.isLoaded.value = true
-            rankUUID = analysisUUID.ifEmpty {
-                Uuid.generateV7().toString()
-            }
         }
         return mutableAnalyser
     }
 
-    @OptIn(ExperimentalUuidApi::class)
     fun setupStateAnalyser(datastore: ChaoxingSignFakerDataStore): MutableStateAnalyser {
         datastore.apply {
             mutableAnalyser.passwordSignCount.value = analysis.passwordSign
@@ -368,9 +147,6 @@ object ChaoxingAnalyser {
             mutableAnalyser.clickSignCount.value = analysis.clickSign
             mutableAnalyser.otherUserSignCount.value = analysis.otherUserSign
             mutableAnalyser.isLoaded.value = true
-            rankUUID = analysisUUID.ifEmpty {
-                Uuid.generateV7().toString()
-            }
         }
         return mutableAnalyser
     }

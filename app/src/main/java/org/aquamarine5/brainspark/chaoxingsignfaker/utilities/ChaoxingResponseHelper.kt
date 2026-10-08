@@ -6,6 +6,8 @@
 
 package org.aquamarine5.brainspark.chaoxingsignfaker.utilities
 
+import org.aquamarine5.brainspark.chaoxingsignfaker.BuildConfig
+
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.os.NetworkOnMainThreadException
@@ -15,7 +17,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import io.sentry.Sentry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -123,7 +124,7 @@ fun Throwable.toastReport(
             Toast.LENGTH_LONG
         ).show()
     } else if (this !is ChaoxingPredictableException) {
-        sentryReport()
+        reportLocalError()
         Toast.makeText(
             context,
             "${prefixTips?.plus(" ") ?: ""}预期外错误:${this.getPredictableMessage()}",
@@ -168,7 +169,7 @@ fun Throwable.snackbarReport(
             }
         }
     } else if (this !is ChaoxingPredictableException) {
-        sentryReport()
+        reportLocalError()
         if (shouldDismiss)
             snackbarHostState?.currentSnackbarData?.dismiss()
         coroutineScope.launch {
@@ -182,7 +183,7 @@ fun Throwable.snackbarReport(
             }
         }
     } else if (this.cause != null && this.cause !is ChaoxingPredictableException) {
-        Sentry.captureException(this)
+        if (BuildConfig.DEBUG) android.util.Log.w("ChaoxingAutoAi", javaClass.simpleName)
         this.cause?.let {
             if (shouldDismiss)
                 snackbarHostState?.currentSnackbarData?.dismiss()
@@ -213,12 +214,12 @@ fun Throwable.snackbarReport(
     }
 }
 
-fun Throwable.sentryReport() {
+fun Throwable.reportLocalError() {
     if (this is CancellationException) throw this
     if (this is ChaoxingPredictableException) return
     if (this is ActivityNotFoundException) return
     if (getNetworkExceptionMessage() != null) return
-    Sentry.captureException(this)
+    if (BuildConfig.DEBUG) android.util.Log.w("ChaoxingAutoAi", javaClass.simpleName)
 }
 
 fun Throwable.ifShouldDeselect(action: () -> Unit) {

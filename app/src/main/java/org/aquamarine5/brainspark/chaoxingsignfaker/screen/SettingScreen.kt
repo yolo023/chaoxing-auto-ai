@@ -69,20 +69,15 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.components.AnalyserCard
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.CurrentDataStoreDialog
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.CustomizeClientCard
 import org.aquamarine5.brainspark.chaoxingsignfaker.components.SnackbarAlertDialog
-import org.aquamarine5.brainspark.chaoxingsignfaker.components.SponsorCard
 import org.aquamarine5.brainspark.chaoxingsignfaker.ui.theme.FontGilroy
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalImageLoader
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalSnackbarHostState
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.OnlyAppDevelopedMode
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.UMengHelper
+import org.aquamarine5.brainspark.chaoxingsignfaker.components.AppUpdateCard
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.chaoxingDataStore
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.displaySnackbar
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.isDevelopedMode
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.sentryReport
-import org.aquamarine5.brainspark.stackbricks.StackbricksComponent
-import org.aquamarine5.brainspark.stackbricks.StackbricksEventTrigger
-import org.aquamarine5.brainspark.stackbricks.StackbricksService
-import org.aquamarine5.brainspark.stackbricks.StackbricksVersionData
+import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.reportLocalError
 
 @Serializable
 object SettingGraphDestination
@@ -102,7 +97,6 @@ var isAlwaysForceSign by mutableStateOf(false)
 
 @Composable
 fun SettingScreen(
-    stackbricksService: StackbricksService,
     naviToLoginScreen: () -> Unit,
     naviToFavoriteLocationSetting: () -> Unit = {}
 ) {
@@ -120,146 +114,16 @@ fun SettingScreen(
         val displayUserEntity =
             (ChaoxingHttpClient.cloneInstance ?: ChaoxingHttpClient.instance!!).userEntity
         var isShowSignoffDialog by remember { mutableStateOf(false) }
-        var isBypassBlockedChecking by remember { mutableStateOf(false) }
-        var isUnblockDialog by remember { mutableStateOf(false) }
         var isIgnoreAllConsistentDeviceCodeComponents by remember { mutableStateOf(false) }
         LaunchedEffect(Unit) {
             context.chaoxingDataStore.data.first().apply {
-                isBypassBlockedChecking = bypassBlockedChecking
                 isIgnoreAllConsistentDeviceCodeComponents =
                     preferences.isIgnoreAllConsistentDeviceCodeComponents
             }
-            launch(Dispatchers.IO) {
-                stackbricksService.deleteTemp()
-            }
+
         }
-        if (isUnblockDialog) {
-            var inputPassword by remember { mutableStateOf("") }
-            SnackbarAlertDialog(onDismissRequest = {
-                isUnblockDialog = false
-            }, title = {
-                Text("输入密码：")
-            }, text = {
-                TextField(inputPassword, onValueChange = {
-                    inputPassword = it
-                }, label = {
-                    Text("密码")
-                })
-            }, dismissButton = {
-                OutlinedButton(onClick = {
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.ContextClick)
-                    isUnblockDialog = false
-                }) {
-                    Text("取消")
-                }
-            }, confirmButton = {
-                val dialogSnackbarHost = LocalSnackbarHostState.current
-                Button(onClick = {
-                    if (inputPassword == BYPASS_BLOCKED_CHECKING_KEY) {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.Confirm)
-                        coroutineScope.launch(Dispatchers.IO) {
-                            isBypassBlockedChecking = true
-                            dialogSnackbarHost.displaySnackbar(
-                                "成功解锁@BypassBlockedChecking",
-                                coroutineScope
-                            )
-                            context.chaoxingDataStore.updateData {
-                                it.toBuilder().setBypassBlockedChecking(true).build()
-                            }
-                        }
-                    } else if (inputPassword.startsWith(COMMAND_SET_RANK_COUNT_PREFIX)) {
-                        inputPassword.substringAfter(COMMAND_SET_RANK_COUNT_PREFIX).toIntOrNull()
-                            ?.let { count ->
-                                coroutineScope.launch(Dispatchers.IO) {
-                                    context.chaoxingDataStore.updateData {
-                                        it.toBuilder().setPreferences(
-                                            it.preferences.toBuilder()
-                                                .setDisplayRankCount(count.coerceAtLeast(5))
-                                        ).build()
-                                    }
-                                    dialogSnackbarHost.displaySnackbar(
-                                        "已设置排行榜显示数量为$count",
-                                        coroutineScope
-                                    )
-                                }
-                            }
-                    } else if (inputPassword.startsWith(COMMAND_ALWAYS_FORCE_SIGN_PREFIX)) {
-                        inputPassword.substringAfter(COMMAND_ALWAYS_FORCE_SIGN_PREFIX)
-                            .toBooleanStrictOrNull()
-                            ?.let { value ->
-                                coroutineScope.launch(Dispatchers.IO) {
-                                    context.chaoxingDataStore.updateData {
-                                        it.toBuilder().setPreferences(
-                                            it.preferences.toBuilder()
-                                                .setAlwaysForceSign(value)
-                                        ).build()
-                                    }
-                                    dialogSnackbarHost.displaySnackbar(
-                                        "已设置${if (value) "总是强制签到" else "不总是强制签到"}",
-                                        coroutineScope
-                                    )
-                                }
-                            }
-                    } else {
-                        dialogSnackbarHost.displaySnackbar(
-                            "密码错误",
-                            coroutineScope
-                        )
-                    }
-                }) {
-                    Text("确认")
-                }
-            })
-        }
-        StackbricksComponent(
-            stackbricksService,
-            trigger = object : StackbricksEventTrigger() {
-                override fun onChannelChanged(isTestChannel: Boolean) {
-                    UMengHelper.onStackbricksTestChannelChangedEvent(
-                        context,
-                        ChaoxingHttpClient.instance!!.name,
-                        isTestChannel
-                    )
-                }
 
-                override fun onCheckUpdate(isTestChannel: Boolean) {
-                    UMengHelper.onStackbricksCheckUpdateEvent(
-                        context,
-                        ChaoxingHttpClient.instance!!.name
-                    )
-                }
-
-                override fun onCheckUpdateOnLaunchChanged(isChecked: Boolean) {
-                    UMengHelper.onStackbricksCheckOnLaunchChangedEvent(
-                        context,
-                        ChaoxingHttpClient.instance!!.name,
-                        isChecked
-                    )
-                }
-
-                override fun onDownloadPackage() {
-
-                }
-
-                override fun onInstallPackage(
-                    isTestChannel: Boolean,
-                    versionData: StackbricksVersionData
-                ) {
-                    if (isTestChannel)
-                        UMengHelper.onStackbricksInstallTestChannelEvent(
-                            context,
-                            ChaoxingHttpClient.instance!!.name,
-                            versionData
-                        )
-                    else
-                        UMengHelper.onStackbricksInstallNewestEvent(
-                            context,
-                            ChaoxingHttpClient.instance!!.name,
-                            versionData
-                        )
-                }
-            }
-        )
+        AppUpdateCard()
         Spacer(modifier = Modifier.height(8.dp))
         if (isShowSignoffDialog) {
             SnackbarAlertDialog(
@@ -287,7 +151,7 @@ fun SettingScreen(
                                         .clearLoginSession()
                                         .build()
                                 }
-                                UMengHelper.profileSignOff()
+
                                 naviToLoginScreen()
                             }
                         }
@@ -337,7 +201,7 @@ fun SettingScreen(
         }
         Spacer(modifier = Modifier.height(8.dp))
 
-        SponsorCard()
+        Text("个人维护版本 · yolo023")
 
         Button(
             onClick = {
@@ -391,7 +255,7 @@ fun SettingScreen(
                     )
                 }.onFailure {
                     snackbarHostState.displaySnackbar("无法打开链接", coroutineScope)
-                    it.sentryReport()
+                    it.reportLocalError()
                 }
             },
             shape = RoundedCornerShape(18.dp),
@@ -446,7 +310,7 @@ fun SettingScreen(
                     })
                 }.onFailure {
                     snackbarHostState.displaySnackbar("无法打开邮件应用", coroutineScope)
-                    it.sentryReport()
+                    it.reportLocalError()
                 }
             },
             shape = RoundedCornerShape(18.dp),
@@ -487,52 +351,10 @@ fun SettingScreen(
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        var clickCount by remember { mutableIntStateOf(0) }
         Text(
-            "ChaoxingSignFaker ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})," +
-                    " channel: ${BuildConfig.umengChannel}," +
-                    " buildDate: ${BuildConfig.releaseDate}," +
-                    " " +
-                    "${if (isBypassBlockedChecking) " BypassBlockedChecking," else ""} " +
-                    "developed by @aquamarine5, All Rights Reserved.",
+            "学习助手 ${BuildConfig.VERSION_NAME} · 基于 ChaoxingSignFaker / @aquamarine5 · AGPL-3.0",
             fontSize = 10.sp,
-            lineHeight = 12.sp,
-            color = Color.Gray,
-            modifier = Modifier.clickable {
-                if (isBypassBlockedChecking || clickCount++ == 0) {
-                    val clipboard =
-                        context.getSystemService(ClipboardManager::class.java)?.primaryClip?.getItemAt(
-                            0
-                        )?.text
-                    if (clipboard == BYPASS_BLOCKED_CHECKING_KEY) {
-                        isBypassBlockedChecking = true
-                        snackbarHostState.displaySnackbar(
-                            "成功解锁@BypassBlockedChecking",
-                            coroutineScope
-                        )
-                        coroutineScope.launch(Dispatchers.IO) {
-                            context.chaoxingDataStore.updateData {
-                                it.toBuilder().setBypassBlockedChecking(true).build()
-                            }
-                        }
-                    } else {
-                        isUnblockDialog = true
-                    }
-                } else if (clickCount >= 2)
-                    Intent(
-                        Intent.ACTION_VIEW,
-                        "orpheus://playlist/13697614404".toUri()
-                    ).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-
-                        if (context.packageManager.resolveActivity(this, 0) != null) {
-                            context.startActivity(this)
-                        } else {
-                            this.data = "https://music.163.com/playlist?id=13697614404".toUri()
-                            context.startActivity(this)
-                        }
-                    }
-            }
+            color = Color.Gray
         )
         Spacer(modifier = Modifier.height(8.dp))
         fun toggleIgnoreAllConsistentDeviceCodeComponents() {

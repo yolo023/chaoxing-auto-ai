@@ -34,13 +34,13 @@ import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ChaoxingEasemobIMConf
 import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ChaoxingOtherUserSharedEntity
 import org.aquamarine5.brainspark.chaoxingsignfaker.entity.ChaoxingUserEntity
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.ChaoxingParseDataException
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.UMengHelper
+import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.LocalSignEvents
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.chaoxingDataStore
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.checkPredictable
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.checkResponseThrowException
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.displaySnackbar
 import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.requirePredictable
-import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.sentryReport
+import org.aquamarine5.brainspark.chaoxingsignfaker.utilities.reportLocalError
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID
@@ -100,7 +100,6 @@ class ChaoxingHttpClient internal constructor(
         }
         ChaoxingHttpRequesterPool.initialize(context.chaoxingDataStore.data.first().otherUsersList)
     }
-
 
     class ChaoxingLoginException(message: String, throwable: Throwable? = null) :
         ChaoxingParseDataException(message, throwable)
@@ -254,7 +253,7 @@ class ChaoxingHttpClient internal constructor(
             login(client, phoneNumber, password, context)
             val session = context.chaoxingDataStore.data.first().loginSession
             val (userEntity, puid) = getInfoWithIdentity(client, context, phoneNumber)
-            UMengHelper.profileSignIn(puid, userEntity.name, phoneNumber)
+
             val effectiveConfiguredFid = session.configuredFid.takeIf { configuredFid ->
                 session.hasConfiguredFid() && userEntity.fidList.any { it.first == configuredFid }
             } ?: userEntity.fidList.first().first
@@ -355,7 +354,7 @@ class ChaoxingHttpClient internal constructor(
                                         ).show()
                                     }
                                     if (it !is PackageManager.NameNotFoundException)
-                                        it.sentryReport()
+                                        it.reportLocalError()
                                     get()
                                 }
                             }
@@ -687,7 +686,7 @@ class ChaoxingHttpClient internal constructor(
             }
             return true
         }.getOrElse {
-            it.sentryReport()
+            it.reportLocalError()
             return false
         }
     }
